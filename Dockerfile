@@ -1,17 +1,12 @@
-FROM python:3.12
+# Dockerfile (LLM microservice)
+FROM python:3.11-slim
 
-# Set working directory
 WORKDIR /app
 
-# Copy requirements and install dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt gunicorn
 
-# Copy the rest of the app
 COPY . .
-
-# Expose the port Flask runs on
+ENV FLASK_ENV=production
 EXPOSE 5000
-
-# Run the Flask app
-CMD ["flask", "run", "--host=0.0.0.0"]
+CMD ["gunicorn", "-w", "2", "-b", "0.0.0.0:5000", "app:app"]
