@@ -157,28 +157,28 @@ def translate_content(content: str) -> Tuple[bool, str]:
     if content == "This is an English message":
         return True, "This is an English message"
     
-    if _looks_unintelligible(content):
-        return True, content
+    # if _looks_unintelligible(content):
+    #     return True, content
 
-    try:
-        lang = get_language(content)
-
-        if isinstance(lang, str) and _canonical_language(lang) == "english":
-            return True, content
-
-        translated = get_translation(content)
-
-        if isinstance(translated, str) and translated.strip():
-            return False, translated.strip()
-
-        return False, "Unable to translate"
-
-    except Exception:
-        return False, "Unable to translate"
     # try:
-    #     return _query_llm_robust(content)
+    #     lang = get_language(content)
+
+    #     if isinstance(lang, str) and _canonical_language(lang) == "english":
+    #         return True, content
+
+    #     translated = get_translation(content)
+
+    #     if isinstance(translated, str) and translated.strip():
+    #         return False, translated.strip()
+
+    #     return False, "Unable to translate"
+
     # except Exception:
     #     return False, "Unable to translate"
+    try:
+        return _query_llm_robust(content)
+    except Exception:
+        return False, "Unable to translate"
 
 def get_language(text:str) -> str:
     """ 
