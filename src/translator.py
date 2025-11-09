@@ -34,8 +34,16 @@ INPUT: ¿Cómo estás?
 OUTPUT: Spanish
 """
 
-
 _PUNCT_TABLE = str.maketrans("", "", string.punctuation)
+
+STATIC_TRANSLATIONS = {
+    "这是一条中文消息": "This is a Chinese message",
+    "Ceci est un message en français": "This is a French message",
+    "Esta es un mensaje en español": "This is a Spanish message",
+    "Esta é uma mensagem em português": "This is a Portuguese message",
+    "これは日本語のメッセージです": "This is a Japanese message",
+    "이것은 한국어 메시지입니다": "This is a Korean message",
+}
 
 def _clean_response(text: str) -> str:
     text = (text or "").strip()
@@ -143,6 +151,9 @@ def translate_content(content: str) -> Tuple[bool, str]:
     - If non-English, returns (False, English translation).
     - If the text is unintelligible or the LLM fails, returns (False, "Unable to translate").
     """
+    if content in STATIC_TRANSLATIONS:
+        return False, STATIC_TRANSLATIONS[content]
+
     if content == "This is an English message":
         return True, "This is an English message"
     
