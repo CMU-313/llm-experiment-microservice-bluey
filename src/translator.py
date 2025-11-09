@@ -106,7 +106,7 @@ def _get_translation_llm(text: str) -> str:
 def _query_llm_robust(post: str) -> Tuple[bool, str]:
     try:
         try:
-            lang_label = _get_language_llm(post)
+            lang_label = get_language(post) #_get_language_llm(post)
             canon = _canonical_language(lang_label)
             is_english = (canon == "english")
         except Exception:
@@ -150,3 +150,16 @@ def translate_content(content: str) -> Tuple[bool, str]:
         return _query_llm_robust(content)
     except Exception:
         return False, "Unable to translate"
+
+def get_language(text:str) -> str:
+    """ 
+    Returns the detected Language by the the text input 
+    """
+    try:
+        language_detected = _get_language_llm(text)
+        if not isinstance(language_detected, str) or not language_detected.strip():
+            return "unknown"
+        canon = _canonical_language(language_detected)
+        return canon or _clean_response(language_detected)
+    except Exception:
+        return "unknown"
