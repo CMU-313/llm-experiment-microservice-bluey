@@ -7,9 +7,10 @@ from typing import Tuple
 import ollama
 
 _OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://ollama:11434")
-_CLIENT = ollama.Client(host=_OLLAMA_HOST)
 MODEL_NAME = os.getenv("LLM_MODEL", "llama3.1:8b")
 _TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0"))
+_OLLAMA_TIMEOUT = float(os.getenv("OLLAMA_TIMEOUT", "120"))
+_CLIENT = ollama.Client(host=_OLLAMA_HOST, timeout=_OLLAMA_TIMEOUT)
 
 TRANSLATION_CONTEXT = """\
 You are now a professional translator. Translate the INPUT text into natural, fluent English.
@@ -90,7 +91,7 @@ def _chat_one(system: str, user: str) -> str:
             {"role": "system", "content": system},
             {"role": "user",   "content": user},
         ],
-        options={"temperature": _TEMPERATURE},
+        options={"temperature": _TEMPERATURE, "num_predict": 256},
     )
     return _clean_response(resp["message"]["content"])
 

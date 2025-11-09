@@ -9,4 +9,4 @@ RUN pip install --no-cache-dir -r requirements.txt gunicorn
 COPY . .
 ENV FLASK_ENV=production
 EXPOSE 5000
-CMD ["gunicorn", "-w", "2", "-b", "0.0.0.0:5000", "app:app"]
+CMD ["gunicorn", "-w", "2", "--threads", "4", "--timeout", "300", "--graceful-timeout", "30", "-k", "gthread", "-b", "0.0.0.0:5000", "app:app"]
