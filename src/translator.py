@@ -4,7 +4,10 @@ import os
 import re
 import string
 from typing import Tuple
+import ollama
 
+_OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://ollama:11434")
+_CLIENT = ollama.Client(host=_OLLAMA_HOST)
 MODEL_NAME = os.getenv("LLM_MODEL", "llama3.1:8b")
 _TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0"))
 
@@ -81,8 +84,7 @@ def _looks_unintelligible(s: str) -> bool:
     return ratio < 0.15
 
 def _chat_one(system: str, user: str) -> str:
-    import ollama
-    resp = ollama.chat(
+    resp = _CLIENT.chat(
         model=MODEL_NAME,
         messages=[
             {"role": "system", "content": system},
