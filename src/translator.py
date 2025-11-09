@@ -111,39 +111,6 @@ def _get_translation_llm(text: str) -> str:
     prompt = f"INPUT: {text}"
     return _chat_one(TRANSLATION_CONTEXT, prompt)
 
-def _query_llm_robust(post: str) -> Tuple[bool, str]:
-    try:
-        try:
-            lang_label = _get_language_llm(post)
-            canon = _canonical_language(lang_label)
-            is_english = (canon == "english")
-        except Exception:
-            is_english = False
-
-        if is_english:
-            if isinstance(post, str) and post.strip():
-                return True, post
-            return True, ""
-
-        if _looks_unintelligible(post):
-            return False, "Unable to translate"
-
-        try:
-            translation = _get_translation_llm(post)
-        except Exception:
-            return False, "Unable to translate"
-
-        if not isinstance(translation, str) or not translation.strip():
-            return False, "Unable to translate"
-
-        if _normalize_text(translation) == _normalize_text(post) and _looks_unintelligible(post):
-            return False, "Unable to translate"
-
-        return False, translation.strip()
-
-    except Exception:
-        return False, "Unable to translate"
-
 def translate_content(content: str) -> Tuple[bool, str]:
     """
     Returns (is_english, text_to_show).
@@ -175,10 +142,6 @@ def translate_content(content: str) -> Tuple[bool, str]:
 
     except Exception:
         return False, "Unable to translate"
-    # try:
-    #     return _query_llm_robust(content)
-    # except Exception:
-    #     return False, "Unable to translate"
 
 def get_language(text:str) -> str:
     """ 
