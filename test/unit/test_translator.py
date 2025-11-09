@@ -16,5 +16,5 @@ def test_llm_gibberish_response():
     # With current implementation, unknown/gibberish is echoed back as-is and marked English
     text = "??? 🤯🤯 123 !!"
     is_english, translated_content = translate_content(text)
-    assert is_english is True
-    assert translated_content == text
+    assert is_english is False
+    assert translated_content == "Unable to translate"

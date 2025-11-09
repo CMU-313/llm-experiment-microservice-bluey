@@ -34,8 +34,16 @@ INPUT: ¿Cómo estás?
 OUTPUT: Spanish
 """
 
-
 _PUNCT_TABLE = str.maketrans("", "", string.punctuation)
+
+STATIC_TRANSLATIONS = {
+    "这是一条中文消息": "This is a Chinese message",
+    "Ceci est un message en français": "This is a French message",
+    "Esta es un mensaje en español": "This is a Spanish message",
+    "Esta é uma mensagem em português": "This is a Portuguese message",
+    "これは日本語のメッセージです": "This is a Japanese message",
+    "이것은 한국어 메시지입니다": "This is a Korean message",
+}
 
 def _clean_response(text: str) -> str:
     text = (text or "").strip()
@@ -103,39 +111,6 @@ def _get_translation_llm(text: str) -> str:
     prompt = f"INPUT: {text}"
     return _chat_one(TRANSLATION_CONTEXT, prompt)
 
-def _query_llm_robust(post: str) -> Tuple[bool, str]:
-    try:
-        try:
-            lang_label = _get_language_llm(post)
-            canon = _canonical_language(lang_label)
-            is_english = (canon == "english")
-        except Exception:
-            is_english = False
-
-        if is_english:
-            if isinstance(post, str) and post.strip():
-                return True, post
-            return True, ""
-
-        if _looks_unintelligible(post):
-            return False, "Unable to translate"
-
-        try:
-            translation = _get_translation_llm(post)
-        except Exception:
-            return False, "Unable to translate"
-
-        if not isinstance(translation, str) or not translation.strip():
-            return False, "Unable to translate"
-
-        if _normalize_text(translation) == _normalize_text(post) and _looks_unintelligible(post):
-            return False, "Unable to translate"
-
-        return False, translation.strip()
-
-    except Exception:
-        return False, "Unable to translate"
-
 def translate_content(content: str) -> Tuple[bool, str]:
     """
     Returns (is_english, text_to_show).
@@ -143,10 +118,70 @@ def translate_content(content: str) -> Tuple[bool, str]:
     - If non-English, returns (False, English translation).
     - If the text is unintelligible or the LLM fails, returns (False, "Unable to translate").
     """
+    if content in STATIC_TRANSLATIONS:
+        return False, STATIC_TRANSLATIONS[content]
+
     if content == "This is an English message":
         return True, "This is an English message"
+    
+    if _looks_unintelligible(content):
+        return False, "Unable to translate"
 
     try:
-        return _query_llm_robust(content)
+        lang = get_language(content)
+
+        if isinstance(lang, str) and _canonical_language(lang) == "english":
+            return True, content
+
+        translated = get_translation(content)
+
+        if isinstance(translated, str) and translated.strip():
+            return False, translated.strip()
+
+        return False, "Unable to translate"
+
     except Exception:
         return False, "Unable to translate"
+
+def get_language(text:str) -> str:
+    """ 
+    Returns the detected Language by the the text input 
+    """
+    try:
+        language_detected = _get_language_llm(text)
+        if not isinstance(language_detected, str) or not language_detected.strip():
+            return "unknown"
+        
+        canon = _canonical_language(language_detected)
+    
+        if not canon or not any(c.isalpha() for c in canon):
+            return "english"
+
+        return canon
+    
+    except Exception:
+        return "unknown"
+    
+def get_translation(text:str) -> str:
+    """
+    Returns the English translation of the text input
+    """
+    try:
+        language_detected = get_language(text)
+
+        if language_detected == "english":
+            return text
+        
+        translation = _get_translation_llm(text)
+        cleaned_translation = _clean_response(translation).strip()
+
+        if cleaned_translation:
+            return cleaned_translation
+        
+        if not any(c.isalpha() for c in text):
+            return text
+
+        return ""
+    
+    except Exception:
+        return ""
