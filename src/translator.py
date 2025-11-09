@@ -1,34 +1,149 @@
-def translate_content(content: str) -> tuple[bool, str]:
-    if content == "这是一条中文消息":
-        return False, "This is a Chinese message"
-    if content == "Ceci est un message en français":
-        return False, "This is a French message"
-    if content == "Esta es un mensaje en español":
-        return False, "This is a Spanish message"
-    if content == "Esta é uma mensagem em português":
-        return False, "This is a Portuguese message"
-    if content  == "これは日本語のメッセージです":
-        return False, "This is a Japanese message"
-    if content == "이것은 한국어 메시지입니다":
-        return False, "This is a Korean message"
-    if content == "Dies ist eine Nachricht auf Deutsch":
-        return False, "This is a German message"
-    if content == "Questo è un messaggio in italiano":
-        return False, "This is an Italian message"
-    if content == "Это сообщение на русском":
-        return False, "This is a Russian message"
-    if content == "هذه رسالة باللغة العربية":
-        return False, "This is an Arabic message"
-    if content == "यह हिंदी में संदेश है":
-        return False, "This is a Hindi message"
-    if content == "นี่คือข้อความภาษาไทย":
-        return False, "This is a Thai message"
-    if content == "Bu bir Türkçe mesajdır":
-        return False, "This is a Turkish message"
-    if content == "Đây là một tin nhắn bằng tiếng Việt":
-        return False, "This is a Vietnamese message"
-    if content == "Esto es un mensaje en catalán":
-        return False, "This is a Catalan message"
+from __future__ import annotations
+
+import os
+import re
+import string
+from typing import Tuple
+
+MODEL_NAME = os.getenv("LLM_MODEL", "llama3.1:8b")
+_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0"))
+
+TRANSLATION_CONTEXT = """\
+You are now a professional translator. Translate the INPUT text into natural, fluent English.
+- Preserve meaning, names, and tone.
+- Do not add explanations or notes.
+- Output ONLY the translation (no quotes, no language name, no extra text).
+- Output the meaning immediately
+"""
+
+CLASSIFICATION_CONTEXT = """\
+You are now a language classifier. Detect the language of the input text and reply only with the English name of that language.
+
+Example:
+INPUT: Bonjour, je m'appelle Bob
+OUTPUT: French
+
+INPUT: Können Sie mir bitte helfen?
+OUTPUT: German
+
+INPUT: ¿Cómo estás?
+OUTPUT: Spanish
+"""
+
+
+_PUNCT_TABLE = str.maketrans("", "", string.punctuation)
+
+def _clean_response(text: str) -> str:
+    text = (text or "").strip()
+    text = re.sub(r"^```(?:\w+)?\s*|\s*```$", "", text).strip()
+    return text
+
+def _normalize_text(s: str) -> str:
+    if s is None:
+        return ""
+    s = s.strip().lower()
+    s = re.sub(r"\s+", " ", s)
+    s = s.translate(_PUNCT_TABLE)
+    return s
+
+_LANGUAGE_ALIASES = {
+    "chinese": {"chinese", "mandarin", "zh", "zh-cn", "zh-hans", "simplified chinese"},
+    "japanese": {"japanese", "jp", "ja"},
+    "korean": {"korean", "ko"},
+    "german": {"german", "de", "deutsch"},
+    "french": {"french", "fr", "français", "francais"},
+    "spanish": {"spanish", "es", "español", "espanol"},
+    "portuguese": {"portuguese", "pt", "português", "portugues", "brazilian portuguese", "pt-br"},
+    "russian": {"russian", "ru", "русский"},
+    "turkish": {"turkish", "tr", "türkçe", "turkce"},
+    "english": {"english", "en"},
+    "italian": {"italian", "it", "italiano"},
+    "arabic": {"arabic", "ar", "العربية"},
+    "hindi": {"hindi", "hi"},
+}
+
+def _canonical_language(label: str) -> str:
+    lab = _normalize_text(label)
+    for canon, variants in _LANGUAGE_ALIASES.items():
+        if lab in variants:
+            return canon
+    return lab
+
+def _looks_unintelligible(s: str) -> bool:
+    if not s or not s.strip():
+        return True
+    total = len(s)
+    alnum = sum(1 for ch in s if ch.isalnum())
+    letters = sum(1 for ch in s if ch.isalpha())
+    if alnum < 3:
+        return True
+    ratio = letters / max(1, total)
+    return ratio < 0.15
+
+def _chat_one(system: str, user: str) -> str:
+    import ollama
+    resp = ollama.chat(
+        model=MODEL_NAME,
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user",   "content": user},
+        ],
+        options={"temperature": _TEMPERATURE},
+    )
+    return _clean_response(resp["message"]["content"])
+
+def _get_language_llm(text: str) -> str:
+    prompt = f"INPUT: {text}"
+    return _chat_one(CLASSIFICATION_CONTEXT, prompt)
+
+def _get_translation_llm(text: str) -> str:
+    prompt = f"INPUT: {text}"
+    return _chat_one(TRANSLATION_CONTEXT, prompt)
+
+def _query_llm_robust(post: str) -> Tuple[bool, str]:
+    try:
+        try:
+            lang_label = _get_language_llm(post)
+            canon = _canonical_language(lang_label)
+            is_english = (canon == "english")
+        except Exception:
+            is_english = False
+
+        if is_english:
+            if isinstance(post, str) and post.strip():
+                return True, post
+            return True, ""
+
+        if _looks_unintelligible(post):
+            return False, "Unable to translate"
+
+        try:
+            translation = _get_translation_llm(post)
+        except Exception:
+            return False, "Unable to translate"
+
+        if not isinstance(translation, str) or not translation.strip():
+            return False, "Unable to translate"
+
+        if _normalize_text(translation) == _normalize_text(post) and _looks_unintelligible(post):
+            return False, "Unable to translate"
+
+        return False, translation.strip()
+
+    except Exception:
+        return False, "Unable to translate"
+
+def translate_content(content: str) -> Tuple[bool, str]:
+    """
+    Returns (is_english, text_to_show).
+    - If input is English, echoes it back (True, original).
+    - If non-English, returns (False, English translation).
+    - If the text is unintelligible or the LLM fails, returns (False, "Unable to translate").
+    """
     if content == "This is an English message":
         return True, "This is an English message"
-    return True, content
+
+    try:
+        return _query_llm_robust(content)
+    except Exception:
+        return False, "Unable to translate"
