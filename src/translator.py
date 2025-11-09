@@ -106,7 +106,7 @@ def _get_translation_llm(text: str) -> str:
 def _query_llm_robust(post: str) -> Tuple[bool, str]:
     try:
         try:
-            lang_label = get_language(post) #Original: _get_language_llm(post)
+            lang_label = _get_language_llm(post)
             canon = _canonical_language(lang_label)
             is_english = (canon == "english")
         except Exception:
@@ -121,7 +121,7 @@ def _query_llm_robust(post: str) -> Tuple[bool, str]:
             return False, "Unable to translate"
 
         try:
-            translation =  get_translation(post) #Original: _get_translation_llm(post)
+            translation = _get_translation_llm(post)
         except Exception:
             return False, "Unable to translate"
 
@@ -159,8 +159,14 @@ def get_language(text:str) -> str:
         language_detected = _get_language_llm(text)
         if not isinstance(language_detected, str) or not language_detected.strip():
             return "unknown"
+        
         canon = _canonical_language(language_detected)
-        return canon or _clean_response(language_detected)
+    
+        if not canon or not any(c.isalpha() for c in canon):
+            return "english"
+
+        return canon
+    
     except Exception:
         return "unknown"
     
@@ -169,8 +175,21 @@ def get_translation(text:str) -> str:
     Returns the English translation of the text input
     """
     try:
+        language_detected = get_language(text)
+
+        if language_detected == "english":
+            return text
+        
         translation = _get_translation_llm(text)
-        cleaned_translation = _clean_response(translation)
-        return cleaned_translation.strip() if cleaned_translation.strip() else ""
+        cleaned_translation = _clean_response(translation).strip()
+
+        if cleaned_translation:
+            return cleaned_translation
+        
+        if not any(c.isalpha() for c in text):
+            return text
+
+        return ""
+    
     except Exception:
         return ""
